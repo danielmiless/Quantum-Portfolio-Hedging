@@ -1,0 +1,150 @@
+# ============================
+# Quantum Portfolio Hedging .gitignore
+# ============================
+
+# ---- Python Bytecode ----
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ---- Build / Distribution ----
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ---- Virtual Environments ----
+.env
+.venv
+env/
+venv/
+ENV/
+.ipynb_checkpoints/
+__pypackages__/
+
+# ---- Notebooks ----
+*.ipynb_checkpoints
+.ipynb_checkpoints/
+
+# ---- Jupyter Notebook outputs ----
+*.nbconvert.ipynb
+*.nbconvert/
+notebooks/.ipynb_checkpoints/
+
+# ---- Quantum Simulation Artifacts ----
+*.qasm
+*.qobj
+*.h5
+*.pkl
+*.npz
+*.npy
+*.json
+*.qiskit_*
+
+# ---- Reinforcement Learning & Logs ----
+logs/
+*.log
+tensorboard/
+tb_logs/
+experiments/
+replays/
+checkpoints/
+results/
+experiments/*/models/
+models/temp/
+models/*.zip
+
+# ---- Data & Datasets ----
+data/
+datasets/
+raw_data/
+*.csv
+*.xlsx
+*.hdf5
+*.dat
+*.out
+*.gz
+*.zip
+*.tar
+*.tar.gz
+*.pkl
+!data/sample_*.csv
+
+# ---- Credentials & Configs ----
+*.env
+*.key
+*.pem
+*.json
+config.yaml
+*.ini
+api_keys/
+secrets/
+!config_template.yaml
+
+# ---- IDE & Editor ----
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.bak
+*.tmp
+ehthumbs.db
+Thumbs.db
+.DS_Store
+
+# ---- Testing ----
+.tox/
+.nox/
+.coverage
+coverage.xml
+*.cover
+*.py,cover
+.pytest_cache/
+nosetests.xml
+htmlcov/
+.hypothesis/
+
+# ---- Documentation Builds ----
+docs/_build/
+site/
+
+# ---- Packaging / Containers ----
+Dockerfile
+Dockerfile.*
+docker-compose.yml
+*.dockerignore
+
+# ---- OS Files ----
+.DS_Store
+Thumbs.db
+*~ 
+*.tmp
+*.bak
+
+# ---- Large ML / Quantum Artifacts ----
+checkpoints/
+weights/
+*.ckpt
+trained_models/
+runs/
+artifacts/
+cached_env/
+classical_benchmarks/
+quantum_results/
+
+# Remove this at the end
+quantum-portfolio-hedging-guide.md
