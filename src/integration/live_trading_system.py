@@ -107,13 +107,9 @@ class LiveTradingSystem:
     
     def _init_optimizer(self):
         """Initialize quantum optimizer."""
-        try:
-            from quantum.multi_objective_optimizer import MultiObjectiveQUBOOptimizer
-            self.quantum_optimizer = MultiObjectiveQUBOOptimizer(tickers=self.tickers)
-            self.logger.info("✅ Quantum optimizer initialized")
-        except Exception as e:
-            self.logger.warning(f"Quantum optimizer not available: {e}")
-            self.quantum_optimizer = None
+        # Don't initialize here - we'll create it when we have data
+        self.quantum_optimizer = None
+        self.logger.info("✅ Quantum optimizer ready (lazy init)")
     
     def _init_order_manager(self):
         """Initialize order management."""
@@ -165,14 +161,20 @@ class LiveTradingSystem:
                 self.logger.error("Failed to download financial data")
                 return None
             
-            # Calculate statistics
+                        # Calculate statistics
             stats = self.data_preparer.calculate_statistics()
             
-            # Run quantum optimization
-            optimal_weights = self.quantum_optimizer.optimize(
-                expected_returns=stats['mean_returns'],
-                cov_matrix=stats['cov_matrix']
+            # Initialize optimizer with actual data
+            from quantum.multi_objective_optimizer import MultiObjectiveQUBOOptimizer
+            import numpy as np
+            
+            optimizer = MultiObjectiveQUBOOptimizer(
+                mu=np.array(stats['mean_returns']),
+                sigma=np.array(stats['cov_matrix'])
             )
+            
+            # Run quantum optimization
+            optimal_weights = optimizer.optimize()
             
             self.last_optimization_time = datetime.now()
             self.logger.info(f"Portfolio optimization completed")
