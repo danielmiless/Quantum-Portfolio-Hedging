@@ -230,7 +230,7 @@ class PositionManager:
         """Update portfolio-level metrics."""
         with self.lock:
             try:
-                account_info = self.broker.get_account_info()
+                account_info = self.broker.get_account()
                 
                 self.portfolio_metrics.update({
                     'cash': float(account_info.get('cash', 0)),
@@ -427,7 +427,7 @@ if __name__ == "__main__":
             return OrderStatus.FILLED
         def get_positions(self) -> List[Position]:
             return self.mock_positions
-        def get_account_info(self) -> Dict:
+        def get_account(self) -> Dict:
             return {
                 'cash': 50000,
                 'buying_power': 100000,
