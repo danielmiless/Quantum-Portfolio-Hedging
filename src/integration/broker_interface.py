@@ -358,30 +358,15 @@ class BrokerFactory:
 
 
 if __name__ == "__main__":
+    # Load .env file first
+    from dotenv import load_dotenv
+    from pathlib import Path
+    
+    # Find and load .env
+    env_path = Path(__file__).parent.parent.parent / '.env'
+    load_dotenv(env_path)
+    
     # Test the broker interface
     logging.basicConfig(level=logging.INFO)
     
     broker = BrokerFactory.create_broker('alpaca')
-    
-    if broker and broker.connect():
-        print("✅ Connected to Alpaca")
-        
-        # Get account info
-        account = broker.get_account()
-        print(f"Portfolio Value: ${account.get('portfolio_value', 0):,.2f}")
-        print(f"Cash: ${account.get('cash', 0):,.2f}")
-        print(f"Buying Power: ${account.get('buying_power', 0):,.2f}")
-        
-        # Get market data
-        market_data = broker.get_market_data('AAPL')
-        print(f"\nAAPL Price: ${market_data.get('last_price', 0):,.2f}")
-        
-        # Get positions
-        positions = broker.get_positions()
-        print(f"\nOpen Positions: {len(positions)}")
-        for pos in positions:
-            print(f"  {pos['symbol']}: {pos['qty']} @ ${pos['current_price']}")
-        
-        broker.disconnect()
-    else:
-        print("❌ Failed to connect to Alpaca")
