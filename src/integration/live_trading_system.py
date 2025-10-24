@@ -155,7 +155,7 @@ class LiveTradingSystem:
             self.logger.info("Running portfolio optimization...")
             financial_data = self.data_preparer.download_data()
             
-            if financial_data is None or financial_data.empty:
+            if financial_data is None or (isinstance(financial_data, dict) and not financial_data):
                 self.logger.error("Failed to download financial data")
                 return None
             
