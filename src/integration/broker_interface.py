@@ -1,7 +1,7 @@
 # src/integration/broker_interface.py
 """
 Broker Interface for Alpaca Trading
-Updated for latest Alpaca API (v0.26+)
+Updated for latest Alpaca API (v0.26+) - CORRECTED
 """
 
 import os
@@ -68,7 +68,7 @@ class BrokerInterface:
 
 
 class AlpacaInterface(BrokerInterface):
-    """Alpaca broker interface - UPDATED FOR CURRENT API."""
+    """Alpaca broker interface - CORRECTED FOR CURRENT API."""
     
     def __init__(self, api_key: Optional[str] = None, secret_key: Optional[str] = None, 
                  base_url: Optional[str] = None, paper: bool = True):
@@ -120,15 +120,24 @@ class AlpacaInterface(BrokerInterface):
             return False
     
     def get_market_data(self, ticker: str) -> Dict:
-        """Get latest market data for a ticker (FIXED for current API)."""
+        """Get latest market data for a ticker (CORRECTED for current API)."""
         try:
             if not self.connected:
                 return {'last_price': 0, 'error': 'Not connected'}
             
-            # Use get_latest_bar() which works with current Alpaca API
-            bar = self.api.get_latest_bar(ticker)
+            # Use get_bars() instead of get_latest_bar()
+            # Get latest 1 bar
+            bars = self.api.get_bars(
+                ticker,
+                '1Day',
+                limit=1,
+                adjustment='all'
+            )
             
-            if bar:
+            if bars is not None and len(bars) > 0:
+                # Get the last bar
+                bar = bars[-1] if isinstance(bars, list) else list(bars.values())[0]
+                
                 return {
                     'last_price': float(bar.c),  # close price
                     'bid': float(bar.o),  # open price (as bid reference)
@@ -228,7 +237,7 @@ class AlpacaInterface(BrokerInterface):
             return []
     
     def get_account(self) -> Dict:
-        """Get account information."""
+        """Get account information (CORRECTED - removed non-existent fields)."""
         try:
             if not self.connected:
                 self.logger.error("Not connected to Alpaca")
@@ -236,22 +245,26 @@ class AlpacaInterface(BrokerInterface):
             
             account = self.api.get_account()
             
-            return {
-                'account_number': account.account_number,
-                'status': account.status,
+            # Build result with only fields that exist
+            result = {
+                'account_number': account.account_number if hasattr(account, 'account_number') else '',
+                'status': account.status if hasattr(account, 'status') else '',
                 'cash': float(account.cash),
                 'portfolio_value': float(account.portfolio_value),
-                'pattern_day_trader': account.pattern_day_trader,
-                'trading_blocked': account.trading_blocked,
-                'account_blocked': account.account_blocked,
-                'multiplier': account.multiplier,
+                'pattern_day_trader': account.pattern_day_trader if hasattr(account, 'pattern_day_trader') else False,
+                'trading_blocked': account.trading_blocked if hasattr(account, 'trading_blocked') else False,
+                'account_blocked': account.account_blocked if hasattr(account, 'account_blocked') else False,
+                'multiplier': int(account.multiplier) if hasattr(account, 'multiplier') else 2,
                 'buying_power': float(account.buying_power),
-                'long_market_value': float(account.long_market_value),
-                'short_market_value': float(account.short_market_value),
+                'long_market_value': float(account.long_market_value) if hasattr(account, 'long_market_value') else 0,
+                'short_market_value': float(account.short_market_value) if hasattr(account, 'short_market_value') else 0,
                 'equity': float(account.equity),
-                'last_equity': float(account.last_equity),
-                'daytrade_buying_power': float(account.daytrade_buying_power)
+                'last_equity': float(account.last_equity) if hasattr(account, 'last_equity') else 0,
             }
+            
+            # Don't include daytrade_buying_power - it doesn't exist in this API version
+            
+            return result
             
         except Exception as e:
             self.logger.error(f"Failed to get account: {e}")
@@ -277,8 +290,8 @@ class AlpacaInterface(BrokerInterface):
                     'type': order.order_type,
                     'time_in_force': order.time_in_force,
                     'created_at': order.created_at,
-                    'filled_qty': float(order.filled_qty),
-                    'filled_avg_price': order.filled_avg_price
+                    'filled_qty': float(order.filled_qty) if order.filled_qty else 0,
+                    'filled_avg_price': order.filled_avg_price if order.filled_avg_price else 0
                 })
             
             return result
@@ -305,8 +318,8 @@ class AlpacaInterface(BrokerInterface):
                 'type': order.order_type,
                 'time_in_force': order.time_in_force,
                 'created_at': order.created_at,
-                'filled_qty': float(order.filled_qty),
-                'filled_avg_price': order.filled_avg_price
+                'filled_qty': float(order.filled_qty) if order.filled_qty else 0,
+                'filled_avg_price': order.filled_avg_price if order.filled_avg_price else 0
             }
             
         except Exception as e:
@@ -320,18 +333,26 @@ class AlpacaInterface(BrokerInterface):
                 self.logger.error("Not connected to Alpaca")
                 return []
             
-            bars = self.api.get_bars(ticker, timeframe, limit=limit)
+            bars = self.api.get_bars(ticker, timeframe, limit=limit, adjustment='all')
             result = []
             
-            for bar in bars:
-                result.append({
-                    'timestamp': bar.t,
-                    'open': float(bar.o),
-                    'high': float(bar.h),
-                    'low': float(bar.l),
-                    'close': float(bar.c),
-                    'volume': int(bar.v)
-                })
+            if bars is not None:
+                # Handle different return types
+                if isinstance(bars, list):
+                    bar_list = bars
+                else:
+                    # It might be a dict or dataframe
+                    bar_list = list(bars.values()) if isinstance(bars, dict) else bars
+                
+                for bar in bar_list:
+                    result.append({
+                        'timestamp': bar.t,
+                        'open': float(bar.o),
+                        'high': float(bar.h),
+                        'low': float(bar.l),
+                        'close': float(bar.c),
+                        'volume': int(bar.v)
+                    })
             
             return result
             
