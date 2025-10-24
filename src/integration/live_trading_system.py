@@ -131,9 +131,7 @@ class LiveTradingSystem:
             self.logger.error("Data preparer not available")
             return False
         
-        if not self.quantum_optimizer:
-            self.logger.error("Quantum optimizer not available")
-            return False
+        # Optimizer is lazy-initialized, so no need to check it here
         
         self.running = True
         self.logger.info("Live trading system started successfully")
