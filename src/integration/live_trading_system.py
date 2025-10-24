@@ -169,7 +169,7 @@ class LiveTradingSystem:
                 
                 optimizer = MultiObjectiveQUBOOptimizer(
                     mu=np.array(stats['mean_returns']),
-                    sigma=np.array(stats['cov_matrix'])
+                    sigma=np.array(stats['ledoit_wolf_cov'])
                 )
                 
                 # Run quantum optimization
