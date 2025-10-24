@@ -108,8 +108,8 @@ class LiveTradingSystem:
     def _init_optimizer(self):
         """Initialize quantum optimizer."""
         try:
-            from quantum.multi_objective_optimizer import MultiObjectiveOptimizer
-            self.quantum_optimizer = MultiObjectiveOptimizer(tickers=self.tickers)
+            from quantum.multi_objective_optimizer import MultiObjectiveQUBOOptimizer
+            self.quantum_optimizer = MultiObjectiveQUBOOptimizer(tickers=self.tickers)
             self.logger.info("✅ Quantum optimizer initialized")
         except Exception as e:
             self.logger.warning(f"Quantum optimizer not available: {e}")
