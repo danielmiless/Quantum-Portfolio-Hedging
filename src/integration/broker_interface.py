@@ -120,40 +120,47 @@ class AlpacaInterface(BrokerInterface):
             return False
     
     def get_market_data(self, ticker: str) -> Dict:
-        """Get latest market data for a ticker (CORRECTED for current API)."""
+        """Get latest market data for a ticker (using quotes, not bars)."""
         try:
             if not self.connected:
                 return {'last_price': 0, 'error': 'Not connected'}
             
-            # Use get_bars() instead of get_latest_bar()
-            # Get latest 1 bar
-            bars = self.api.get_bars(
-                ticker,
-                '1Day',
-                limit=1,
-                adjustment='all'
-            )
+            # Use get_latest_trade() for real-time data
+            try:
+                trade = self.api.get_latest_trade(ticker)
+                if trade:
+                    return {
+                        'last_price': float(trade.price),
+                        'bid': float(trade.price),
+                        'ask': float(trade.price),
+                        'volume': int(trade.size),
+                        'timestamp': trade.timestamp
+                    }
+            except Exception as trade_error:
+                self.logger.debug(f"Could not get trade data: {trade_error}")
             
-            if bars is not None and len(bars) > 0:
-                # Get the last bar
-                bar = bars[-1] if isinstance(bars, list) else list(bars.values())[0]
-                
-                return {
-                    'last_price': float(bar.c),  # close price
-                    'bid': float(bar.o),  # open price (as bid reference)
-                    'ask': float(bar.c),  # close price (as ask reference)
-                    'open': float(bar.o),
-                    'high': float(bar.h),
-                    'low': float(bar.l),
-                    'volume': int(bar.v),
-                    'timestamp': bar.t
-                }
-            else:
-                return {'last_price': 0, 'error': f'No data for {ticker}'}
+            # Fallback: Try to get quote
+            try:
+                quote = self.api.get_latest_quote(ticker)
+                if quote:
+                    return {
+                        'last_price': float((quote.ask_price + quote.bid_price) / 2),  # midpoint
+                        'bid': float(quote.bid_price),
+                        'ask': float(quote.ask_price),
+                        'bid_size': int(quote.bid_size),
+                        'ask_size': int(quote.ask_size),
+                        'timestamp': quote.timestamp
+                    }
+            except Exception as quote_error:
+                self.logger.debug(f"Could not get quote data: {quote_error}")
+            
+            # Final fallback: Return zero
+            return {'last_price': 0, 'error': f'No market data for {ticker}'}
                 
         except Exception as e:
             self.logger.error(f"Error getting market data for {ticker}: {e}")
             return {'last_price': 0, 'error': str(e)}
+
     
     def submit_order(self, ticker: str, quantity: float, order_type: OrderType, 
                      order_class: str = "simple", time_in_force: str = "day") -> Optional[Dict]:
