@@ -147,8 +147,8 @@ class LiveTradingSystem:
     def run_portfolio_optimization(self) -> Optional[Dict]:
         """Run quantum portfolio optimization."""
         try:
-            if not self.data_preparer or not self.quantum_optimizer:
-                self.logger.warning("Required components not available for optimization")
+            if not self.data_preparer:
+                self.logger.warning("Data preparer not available for optimization")
                 return None
             
             # Download data
@@ -159,20 +159,27 @@ class LiveTradingSystem:
                 self.logger.error("Failed to download financial data")
                 return None
             
-                        # Calculate statistics
+            # Calculate statistics
             stats = self.data_preparer.calculate_statistics()
             
-            # Initialize optimizer with actual data
-            from quantum.multi_objective_optimizer import MultiObjectiveQUBOOptimizer
-            import numpy as np
-            
-            optimizer = MultiObjectiveQUBOOptimizer(
-                mu=np.array(stats['mean_returns']),
-                sigma=np.array(stats['cov_matrix'])
-            )
-            
-            # Run quantum optimization
-            optimal_weights = optimizer.optimize()
+            # Initialize optimizer with actual data (lazy initialization)
+            try:
+                from quantum.multi_objective_optimizer import MultiObjectiveQUBOOptimizer
+                import numpy as np
+                
+                optimizer = MultiObjectiveQUBOOptimizer(
+                    mu=np.array(stats['mean_returns']),
+                    sigma=np.array(stats['cov_matrix'])
+                )
+                
+                # Run quantum optimization
+                optimal_weights = optimizer.optimize()
+                
+            except Exception as opt_error:
+                self.logger.error(f"Quantum optimization failed: {opt_error}")
+                # Fallback to equal weights if optimization fails
+                optimal_weights = {ticker: 1.0/len(self.tickers) for ticker in self.tickers}
+                self.logger.warning(f"Using equal-weight portfolio as fallback")
             
             self.last_optimization_time = datetime.now()
             self.logger.info(f"Portfolio optimization completed")
