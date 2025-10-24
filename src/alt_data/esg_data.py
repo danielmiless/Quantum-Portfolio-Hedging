@@ -1,11 +1,35 @@
-# Place in: src/alt_data/esg_data.py
+# src/alt_data/esg_data.py
+"""
+ESG data integration with environment variable support and fixed imports
+"""
 
 import numpy as np
 import pandas as pd
-import yfinance as yf
+import sys
+import os
 from typing import Dict, List, Tuple, Optional
+from pathlib import Path
 import warnings
 import requests
+
+# Fix imports by adding project paths
+current_dir = Path(__file__).parent
+project_root = current_dir.parent.parent
+src_dir = current_dir.parent
+
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
+
+# Import centralized config
+try:
+    from config import Config
+except ImportError:
+    class Config:
+        MSCI_ESG_API_KEY = os.getenv('MSCI_ESG_API_KEY')
+        SUSTAINALYTICS_API_KEY = os.getenv('SUSTAINALYTICS_API_KEY')
+        REFINITIV_API_KEY = os.getenv('REFINITIV_API_KEY')
 
 
 class ESGDataProvider:
@@ -14,7 +38,21 @@ class ESGDataProvider:
     Handles data retrieval, normalization, and imputation.
     """
     
-    def __init__(self):
+    def __init__(self, msci_api_key: Optional[str] = None,
+                 sustainalytics_api_key: Optional[str] = None,
+                 refinitiv_api_key: Optional[str] = None):
+        """
+        Initialize ESG data provider.
+        
+        Args:
+            msci_api_key: MSCI ESG API key (uses Config.MSCI_ESG_API_KEY if None)
+            sustainalytics_api_key: Sustainalytics API key
+            refinitiv_api_key: Refinitiv API key
+        """
+        self.msci_api_key = msci_api_key or Config.MSCI_ESG_API_KEY
+        self.sustainalytics_api_key = sustainalytics_api_key or Config.SUSTAINALYTICS_API_KEY
+        self.refinitiv_api_key = refinitiv_api_key or Config.REFINITIV_API_KEY
+        
         self.esg_scores = {}
         self.carbon_data = {}
         self.sdg_alignment = {}
@@ -23,6 +61,12 @@ class ESGDataProvider:
         """
         Load sample ESG data for testing.
         In production, integrate with ESG data providers.
+        
+        Args:
+            tickers: List of ticker symbols
+            
+        Returns:
+            DataFrame with ESG scores
         """
         # Sample ESG scores (in practice, fetch from MSCI/Sustainalytics APIs)
         esg_data = {
@@ -65,28 +109,46 @@ class ESGDataProvider:
         
         return df
     
-    def integrate_msci_esg(self, tickers: List[str], api_key: Optional[str] = None) -> pd.DataFrame:
+    def integrate_msci_esg(self, tickers: List[str]) -> pd.DataFrame:
         """
         Integrate with MSCI ESG API (placeholder).
         In production, requires MSCI ESG Manager subscription.
+        
+        Args:
+            tickers: List of ticker symbols
+            
+        Returns:
+            DataFrame with ESG scores
         """
-        if api_key is None:
-            warnings.warn("MSCI API key not provided. Using sample data.")
+        if not self.msci_api_key:
+            warnings.warn("MSCI API key not found. Using sample data.")
             return self.load_sample_esg_data(tickers)
         
         # Placeholder for actual MSCI API integration
-        # headers = {'Authorization': f'Bearer {api_key}'}
-        # response = requests.get(f'https://api.msci.com/esg/v1/ratings', 
-        #                        headers=headers, params={'tickers': ','.join(tickers)})
+        # In production:
+        # headers = {'Authorization': f'Bearer {self.msci_api_key}'}
+        # response = requests.get(
+        #     'https://api.msci.com/esg/v1/ratings',
+        #     headers=headers,
+        #     params={'tickers': ','.join(tickers)}
+        # )
+        # data = response.json()
         
+        print("⚠️  MSCI API key found but using sample data (API not implemented)")
         return self.load_sample_esg_data(tickers)
     
     def calculate_esg_momentum(self, esg_scores: pd.DataFrame, 
                               historical_window: int = 12) -> pd.DataFrame:
         """
         Calculate ESG score momentum (improvement over time).
+        
+        Args:
+            esg_scores: Current ESG scores
+            historical_window: Lookback window in months
+            
+        Returns:
+            DataFrame with ESG momentum
         """
-        # Simulate historical ESG scores for demonstration
         momentum_data = []
         
         for ticker in esg_scores.index:
@@ -109,6 +171,12 @@ class ESGDataProvider:
     def map_to_sdg(self, esg_scores: pd.DataFrame) -> pd.DataFrame:
         """
         Map ESG scores to UN Sustainable Development Goals alignment.
+        
+        Args:
+            esg_scores: ESG scores DataFrame
+            
+        Returns:
+            DataFrame with SDG alignment scores
         """
         sdg_mapping = []
         
@@ -164,7 +232,6 @@ class CarbonFootprintCalculator:
         total_footprint = np.sum(weights * market_caps * carbon_intensities / 1e6)
         
         # Carbon efficiency (return per unit carbon)
-        # Assuming equal expected returns for simplicity
         carbon_efficiency = 1.0 / waci if waci > 0 else 0
         
         return {
@@ -200,27 +267,31 @@ class CarbonFootprintCalculator:
 
 # Example usage
 if __name__ == "__main__":
+    print("ESG Data Provider Test")
+    print("=" * 30)
+    
     # Test ESG data integration
     tickers = ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA', 'XOM']
     
     provider = ESGDataProvider()
     
     # Load ESG scores
+    print("\n1. Loading ESG Scores:")
     esg_data = provider.load_sample_esg_data(tickers)
-    print("ESG Scores:")
     print(esg_data)
     
     # Calculate ESG momentum
+    print("\n2. ESG Momentum:")
     momentum = provider.calculate_esg_momentum(esg_data)
-    print("\nESG Momentum:")
     print(momentum)
     
     # SDG alignment
+    print("\n3. SDG Alignment:")
     sdg_data = provider.map_to_sdg(esg_data)
-    print("\nSDG Alignment:")
     print(sdg_data[['sdg_climate_action', 'avg_sdg_alignment']])
     
     # Carbon footprint
+    print("\n4. Portfolio Carbon Footprint:")
     calculator = CarbonFootprintCalculator()
     
     weights = np.array([0.2, 0.2, 0.2, 0.2, 0.1, 0.1])
@@ -231,7 +302,17 @@ if __name__ == "__main__":
         weights, carbon_intensities, market_caps
     )
     
-    print("\nPortfolio Carbon Metrics:")
+    print("Portfolio Carbon Metrics:")
     for metric, value in carbon_metrics.items():
         print(f"  {metric}: {value:.2f}")
     
+    # Test with API key (if available)
+    print("\n5. Testing MSCI Integration:")
+    if Config.MSCI_ESG_API_KEY:
+        print(f"  ✅ MSCI API key found: {Config.MSCI_ESG_API_KEY[:8]}...")
+        esg_data_api = provider.integrate_msci_esg(tickers)
+    else:
+        print("  ⚠️  MSCI API key not found in .env")
+        print("  Set MSCI_ESG_API_KEY to use production ESG data")
+    
+    print("\n✅ ESG Data Provider test completed")

@@ -8,9 +8,21 @@ import yfinance as yf
 import pandas as pd
 import numpy as np
 from typing import List, Tuple, Dict, Optional
+import sys
+from pathlib import Path
 import warnings
 warnings.filterwarnings('ignore')
 
+
+# Fix imports by adding project paths
+current_dir = Path(__file__).parent
+project_root = current_dir.parent.parent
+src_dir = current_dir.parent
+
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+if str(src_dir) not in sys.path:
+    sys.path.insert(0, str(src_dir))
 
 class PortfolioDataPreparer:
     """
