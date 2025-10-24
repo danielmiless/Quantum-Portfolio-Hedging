@@ -3,11 +3,13 @@
 Machine learning models for return forecasting and portfolio optimization
 """
 
+
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Tuple, Optional, Union
 from dataclasses import dataclass
 import warnings
+
 
 # ML imports
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
@@ -15,6 +17,7 @@ from sklearn.linear_model import Ridge, ElasticNet
 from sklearn.preprocessing import StandardScaler, RobustScaler
 from sklearn.metrics import mean_squared_error, mean_absolute_error
 from sklearn.model_selection import TimeSeriesSplit, cross_val_score
+
 
 # Deep learning (optional)
 try:
@@ -27,6 +30,7 @@ except ImportError:
     warnings.warn("PyTorch not available. Using sklearn models only.")
 
 
+
 @dataclass
 class ForecastingConfig:
     """Configuration for ML forecasting models."""
@@ -35,6 +39,7 @@ class ForecastingConfig:
     feature_engineering: bool = True
     cross_validation_splits: int = 5
     ensemble_models: bool = True
+
 
 
 class FeatureEngineer:
@@ -57,34 +62,42 @@ class FeatureEngineer:
             features[f'{col}_MA_20'] = price.rolling(20).mean()
             features[f'{col}_MA_60'] = price.rolling(60).mean()
             
-            # Moving average ratios
-            features[f'{col}_MA_ratio_5_20'] = features[f'{col}_MA_5'] / features[f'{col}_MA_20']
-            features[f'{col}_MA_ratio_20_60'] = features[f'{col}_MA_20'] / features[f'{col}_MA_60']
+            # Moving average ratios (with safeguards)
+            ma_20 = features[f'{col}_MA_20']
+            ma_60 = features[f'{col}_MA_60']
+            features[f'{col}_MA_ratio_5_20'] = features[f'{col}_MA_5'] / ma_20.replace(0, np.nan)
+            features[f'{col}_MA_ratio_20_60'] = ma_20 / ma_60.replace(0, np.nan)
             
             # Volatility features
             returns = price.pct_change()
             features[f'{col}_volatility_5'] = returns.rolling(5).std()
             features[f'{col}_volatility_20'] = returns.rolling(20).std()
             
-            # Momentum features
-            features[f'{col}_momentum_5'] = price / price.shift(5) - 1
-            features[f'{col}_momentum_20'] = price / price.shift(20) - 1
+            # Momentum features (with safeguards)
+            shifted_5 = price.shift(5).replace(0, np.nan)
+            shifted_20 = price.shift(20).replace(0, np.nan)
+            features[f'{col}_momentum_5'] = (price / shifted_5 - 1).clip(-1, 1)
+            features[f'{col}_momentum_20'] = (price / shifted_20 - 1).clip(-1, 1)
             
-            # RSI (simplified)
+            # RSI (simplified, with safeguards)
             delta = returns
             gain = (delta.where(delta > 0, 0)).rolling(14).mean()
             loss = (-delta.where(delta < 0, 0)).rolling(14).mean()
-            rs = gain / loss
+            rs = gain / loss.replace(0, np.nan)
             features[f'{col}_RSI'] = 100 - (100 / (1 + rs))
+            features[f'{col}_RSI'] = features[f'{col}_RSI'].fillna(50)  # Neutral RSI if undefined
             
-            # Bollinger Bands
+            # Bollinger Bands (with safeguards)
             ma20 = features[f'{col}_MA_20']
             std20 = price.rolling(20).std()
             features[f'{col}_BB_upper'] = ma20 + (std20 * 2)
             features[f'{col}_BB_lower'] = ma20 - (std20 * 2)
-            features[f'{col}_BB_position'] = (price - features[f'{col}_BB_lower']) / (
-                features[f'{col}_BB_upper'] - features[f'{col}_BB_lower'])
+            bb_range = (features[f'{col}_BB_upper'] - features[f'{col}_BB_lower']).replace(0, np.nan)
+            features[f'{col}_BB_position'] = (price - features[f'{col}_BB_lower']) / bb_range
+            features[f'{col}_BB_position'] = features[f'{col}_BB_position'].clip(0, 1)
         
+        # Replace any remaining inf/nan
+        features = features.replace([np.inf, -np.inf], np.nan)
         return features.dropna()
     
     def create_market_features(self, prices: pd.DataFrame, 
@@ -96,21 +109,27 @@ class FeatureEngineer:
         market_returns = prices.pct_change().mean(axis=1)
         features['market_volatility'] = market_returns.rolling(20).std()
         
-        # Market momentum
+        # Market momentum (with safeguards)
         market_prices = prices.mean(axis=1)
-        features['market_momentum_5'] = market_prices / market_prices.shift(5) - 1
-        features['market_momentum_20'] = market_prices / market_prices.shift(20) - 1
+        shifted_5 = market_prices.shift(5).replace(0, np.nan)
+        shifted_20 = market_prices.shift(20).replace(0, np.nan)
+        features['market_momentum_5'] = (market_prices / shifted_5 - 1).clip(-1, 1)
+        features['market_momentum_20'] = (market_prices / shifted_20 - 1).clip(-1, 1)
         
         # Correlation features
         returns = prices.pct_change()
-        features['avg_correlation'] = returns.rolling(60).corr().groupby(level=0).mean().mean(axis=1)
+        rolling_corr = returns.rolling(60).corr()
+        features['avg_correlation'] = rolling_corr.groupby(level=0).mean().mean(axis=1)
         
         # Add external market data if provided (VIX, interest rates, etc.)
         if market_data is not None:
             for col in market_data.columns:
                 features[f'market_{col}'] = market_data[col]
         
+        # Replace any remaining inf/nan
+        features = features.replace([np.inf, -np.inf], np.nan)
         return features.dropna()
+
 
 
 class MLReturnForecaster:
@@ -167,6 +186,10 @@ class MLReturnForecaster:
         X = features.loc[valid_idx].values
         y = targets.loc[valid_idx].values
         
+        # Additional safety: clip extreme values
+        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+        y = np.nan_to_num(y, nan=0.0, posinf=0.0, neginf=0.0)
+        
         return X, y
     
     def train_models(self, X: np.ndarray, y: np.ndarray) -> Dict:
@@ -186,12 +209,12 @@ class MLReturnForecaster:
         # Time series cross-validation
         tscv = TimeSeriesSplit(n_splits=self.config.cross_validation_splits)
         
-        # Model definitions
+        # Model definitions with more regularization
         model_configs = {
-            'ridge': Ridge(alpha=1.0),
-            'elastic_net': ElasticNet(alpha=0.1, l1_ratio=0.5),
-            'random_forest': RandomForestRegressor(n_estimators=100, random_state=42),
-            'gradient_boosting': GradientBoostingRegressor(n_estimators=100, random_state=42)
+            'ridge': Ridge(alpha=10.0),  # Increased regularization
+            'elastic_net': ElasticNet(alpha=1.0, l1_ratio=0.5, max_iter=2000),  # More iterations
+            'random_forest': RandomForestRegressor(n_estimators=100, max_depth=10, random_state=42),
+            'gradient_boosting': GradientBoostingRegressor(n_estimators=100, max_depth=5, random_state=42)
         }
         
         # Train models for each asset
@@ -201,21 +224,29 @@ class MLReturnForecaster:
             
             y_asset = y[:, asset_idx]
             
-            # Scale features
+            # Scale features with robust scaler
             scaler = RobustScaler()
             X_scaled = scaler.fit_transform(X)
+            
+            # Additional clipping after scaling
+            X_scaled = np.clip(X_scaled, -10, 10)
+            
             asset_scalers['features'] = scaler
             
             for model_name, model in model_configs.items():
-                # Cross-validation
-                cv_scores = cross_val_score(model, X_scaled, y_asset, 
-                                          cv=tscv, scoring='neg_mean_squared_error')
-                
-                # Train on full data
-                model.fit(X_scaled, y_asset)
-                asset_models[model_name] = model
-                
-                print(f"Asset {asset_idx}, {model_name}: CV Score = {-cv_scores.mean():.6f} ± {cv_scores.std():.6f}")
+                try:
+                    # Cross-validation
+                    cv_scores = cross_val_score(model, X_scaled, y_asset, 
+                                              cv=tscv, scoring='neg_mean_squared_error')
+                    
+                    # Train on full data
+                    model.fit(X_scaled, y_asset)
+                    asset_models[model_name] = model
+                    
+                    print(f"Asset {asset_idx}, {model_name}: CV Score = {-cv_scores.mean():.6f} ± {cv_scores.std():.6f}")
+                except Exception as e:
+                    print(f"Asset {asset_idx}, {model_name}: Training failed - {e}")
+                    continue
             
             self.models[asset_idx] = asset_models
             self.scalers[asset_idx] = asset_scalers
@@ -238,6 +269,9 @@ class MLReturnForecaster:
         n_assets = len(self.models)
         n_samples = X.shape[0]
         
+        # Safety: clean input
+        X = np.nan_to_num(X, nan=0.0, posinf=0.0, neginf=0.0)
+        
         predictions = {}
         
         # Get predictions from each model type
@@ -245,8 +279,17 @@ class MLReturnForecaster:
             model_predictions = np.zeros((n_samples, n_assets))
             
             for asset_idx in range(n_assets):
+                if model_name not in self.models[asset_idx]:
+                    continue
+                    
                 # Scale features
                 X_scaled = self.scalers[asset_idx]['features'].transform(X)
+                
+                # Clip extreme values after scaling
+                X_scaled = np.clip(X_scaled, -10, 10)
+                
+                # Safety: ensure no inf/nan
+                X_scaled = np.nan_to_num(X_scaled, nan=0.0, posinf=0.0, neginf=0.0)
                 
                 # Predict
                 model = self.models[asset_idx][model_name]
@@ -255,7 +298,7 @@ class MLReturnForecaster:
             predictions[model_name] = model_predictions
         
         # Ensemble prediction (equal weighting)
-        if self.config.ensemble_models:
+        if self.config.ensemble_models and len(predictions) > 0:
             ensemble_pred = np.mean(list(predictions.values()), axis=0)
             predictions['ensemble'] = ensemble_pred
         
@@ -290,6 +333,7 @@ class MLReturnForecaster:
             }
         
         return metrics
+
 
 
 class QuantumMLPortfolioOptimizer:
@@ -340,6 +384,7 @@ class QuantumMLPortfolioOptimizer:
         quantum_result['predicted_returns'] = mu_predicted
         
         return quantum_result
+
 
 
 # Example usage

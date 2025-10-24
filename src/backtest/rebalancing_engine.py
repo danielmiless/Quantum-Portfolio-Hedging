@@ -5,6 +5,7 @@ Dynamic portfolio rebalancing with transaction cost optimization
 
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
 from typing import Dict, List, Tuple, Optional
 from datetime import datetime, timedelta
 from dataclasses import dataclass

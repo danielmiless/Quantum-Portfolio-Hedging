@@ -3,12 +3,12 @@
 Complete quantum portfolio optimization system integrating all components
 """
 
-from data_preparation import PortfolioDataPreparer
-from quantum_hardware_interface import DWaveQUBOSolver, QuantumPortfolioOptimizer
-from ml_return_forecasting import MLReturnForecaster, ForecastingConfig, QuantumMLPortfolioOptimizer
-from advanced_risk_models import CVaROptimizer, FactorRiskModel
-from multi_objective_optimizer import MultiObjectiveQUBOOptimizer, OptimizationObjectives
-from rebalancing_engine import PortfolioRebalancer, RebalancingConfig
+from quantum.data_preparation import PortfolioDataPreparer
+from quantum.quantum_hardware_interface import DWaveQUBOSolver, QuantumPortfolioOptimizer
+from alt_data.ml_return_forecasting import MLReturnForecaster, ForecastingConfig, QuantumMLPortfolioOptimizer
+from quantum.advanced_risk_models import CVaROptimizer, FactorRiskModel
+from quantum.multi_objective_optimizer import MultiObjectiveQUBOOptimizer, OptimizationObjectives
+from backtest.rebalancing_engine import PortfolioRebalancer, RebalancingConfig
 
 def run_complete_quantum_portfolio_system():
     """

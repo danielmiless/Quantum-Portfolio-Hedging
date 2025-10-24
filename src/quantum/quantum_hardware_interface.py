@@ -45,19 +45,42 @@ class DWaveQUBOSolver(QuantumSolver):
     """
     
     def __init__(self, use_hardware: bool = False, 
-                 chain_strength: Optional[float] = None):
+                 chain_strength: Optional[float] = None,
+                 token: Optional[str] = None):
         """
         Args:
             use_hardware: Use actual D-Wave hardware vs simulator
-            chain_strength: Strength of chains in embedding
+            chain_strength: Strength of chains in embedding (for hardware)
+            token: D-Wave API token (optional, can be set in config file)
         """
         self.use_hardware = use_hardware and DWAVE_AVAILABLE
-        self.chain_strength = chain_strength
+        self.chain_strength = chain_strength  # <-- ADD THIS LINE
+        self.token = token
         
         if self.use_hardware:
-            self.sampler = EmbeddingComposite(DWaveSampler())
+            if not DWAVE_AVAILABLE:
+                warnings.warn("D-Wave Ocean SDK not available. Falling back to simulator.")
+                self.use_hardware = False
+                self.sampler = SimulatedAnnealingSampler()
+            else:
+                try:
+                    # Try to connect to D-Wave hardware
+                    if token:
+                        self.sampler = EmbeddingComposite(DWaveSampler(token=token))
+                    else:
+                        # Will use token from dwave config file or environment
+                        self.sampler = EmbeddingComposite(DWaveSampler())
+                except Exception as e:
+                    warnings.warn(f"D-Wave hardware connection failed: {e}. Using simulator.")
+                    self.use_hardware = False
+                    self.sampler = SimulatedAnnealingSampler()
         else:
-            self.sampler = SimulatedAnnealingSampler()
+            # Always use simulator when use_hardware=False
+            if DWAVE_AVAILABLE:
+                self.sampler = SimulatedAnnealingSampler()
+            else:
+                warnings.warn("D-Wave SDK not available. Install with: pip install dwave-ocean-sdk")
+                self.sampler = None
     
     def solve(self, Q: np.ndarray, num_reads: int = 1000) -> Dict:
         """
@@ -250,7 +273,7 @@ class QuantumPortfolioOptimizer:
         Returns:
             Optimization results with quantum solution
         """
-        from multi_objective_optimizer import MultiObjectiveQUBOOptimizer, OptimizationObjectives
+        from .multi_objective_optimizer import MultiObjectiveQUBOOptimizer, OptimizationObjectives
         
         # Build QUBO matrix
         optimizer = MultiObjectiveQUBOOptimizer(mu, sigma)

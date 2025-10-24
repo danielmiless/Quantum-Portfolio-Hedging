@@ -3,6 +3,7 @@
 Real-time portfolio monitoring dashboard
 """
 
+
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
@@ -12,10 +13,33 @@ import numpy as np
 from datetime import datetime, timedelta
 import time
 
+
 # Import our quantum portfolio modules
-from data_preparation import PortfolioDataPreparer
-from quantum_hardware_interface import DWaveQUBOSolver, QuantumPortfolioOptimizer
-from ml_return_forecasting import MLReturnForecaster, ForecastingConfig
+from quantum.data_preparation import PortfolioDataPreparer
+from quantum.quantum_hardware_interface import DWaveQUBOSolver, QuantumPortfolioOptimizer
+from alt_data.ml_return_forecasting import MLReturnForecaster, ForecastingConfig
+
+
+# Move load_data outside the class as a standalone cached function
+@st.cache_data
+def load_data(tickers, start_date, end_date):
+    """Load and cache market data."""
+    try:
+        preparer = PortfolioDataPreparer(
+            list(tickers),
+            start_date.strftime('%Y-%m-%d'), 
+            end_date.strftime('%Y-%m-%d')
+        )
+        
+        with st.spinner('Loading market data...'):
+            data = preparer.download_data()
+            stats = preparer.calculate_statistics()
+        
+        return data, stats, preparer
+        
+    except Exception as e:
+        st.error(f"Error loading data: {e}")
+        return None, None, None
 
 
 class QuantumPortfolioDashboard:
@@ -108,33 +132,13 @@ class QuantumPortfolioDashboard:
             'use_ml_forecasts': use_ml_forecasts
         })
     
-    @st.cache_data
-    def load_data(self, tickers, start_date, end_date):
-        """Load and cache market data."""
-        try:
-            preparer = PortfolioDataPreparer(
-                tickers, 
-                start_date.strftime('%Y-%m-%d'), 
-                end_date.strftime('%Y-%m-%d')
-            )
-            
-            with st.spinner('Loading market data...'):
-                data = preparer.download_data()
-                stats = preparer.calculate_statistics()
-            
-            return data, stats, preparer
-            
-        except Exception as e:
-            st.error(f"Error loading data: {e}")
-            return None, None, None
-    
     def render_portfolio_overview(self):
         """Render portfolio overview tab."""
         st.header("Portfolio Overview")
         
-        # Load data
-        data, stats, preparer = self.load_data(
-            st.session_state.tickers,
+        # Load data using standalone function
+        data, stats, preparer = load_data(
+            tuple(st.session_state.tickers),  # Convert to tuple for hashing
             st.session_state.start_date,
             st.session_state.end_date
         )
@@ -213,8 +217,8 @@ class QuantumPortfolioDashboard:
         st.header("⚛️ Quantum Portfolio Optimization")
         
         # Load data
-        data, stats, preparer = self.load_data(
-            st.session_state.tickers,
+        data, stats, preparer = load_data(
+            tuple(st.session_state.tickers),
             st.session_state.start_date,
             st.session_state.end_date
         )
@@ -305,8 +309,8 @@ class QuantumPortfolioDashboard:
             return
         
         # Load data
-        data, stats, preparer = self.load_data(
-            st.session_state.tickers,
+        data, stats, preparer = load_data(
+            tuple(st.session_state.tickers),
             st.session_state.start_date,
             st.session_state.end_date
         )
@@ -378,6 +382,8 @@ class QuantumPortfolioDashboard:
                     
                 except Exception as e:
                     st.error(f"ML forecasting error: {e}")
+                    import traceback
+                    st.code(traceback.format_exc())
                     return
         
         # Display ML results if available
@@ -446,9 +452,6 @@ class QuantumPortfolioDashboard:
         """Render performance analytics tab."""
         st.header("📈 Performance Analytics")
         
-        # This would typically show backtesting results,
-        # risk attribution, performance attribution, etc.
-        
         st.info("Performance analytics would be implemented here with:")
         st.markdown("""
         - **Backtesting Results**: Historical performance simulation
@@ -479,3 +482,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+# cd "/Users/danielmiles/Documents/Quant Finance/Quantum Portfolio Hedging/src"
+# streamlit run integration/portfolio_dashboard.py
