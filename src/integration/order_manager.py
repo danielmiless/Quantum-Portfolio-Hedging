@@ -124,7 +124,7 @@ class OrderValidator:
     def _validate_account_requirements(self, order: Order, result: OrderValidationResult):
         """Validate account has sufficient buying power."""
         try:
-            account_info = self.broker.get_account_info()
+            account_info = self.broker.get_account()
             
             if order.side == 'BUY':
                 buying_power = float(account_info.get('buying_power', 0))
@@ -500,7 +500,7 @@ if __name__ == "__main__":
         def get_positions(self) -> List[Position]:
             return []
             
-        def get_account_info(self) -> Dict:
+        def get_account(self) -> Dict:
             return {'buying_power': 100000, 'portfolio_value': 500000}
             
         def get_market_data(self, symbol: str) -> Dict:
