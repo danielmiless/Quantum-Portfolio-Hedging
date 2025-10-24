@@ -89,7 +89,17 @@ class LiveTradingSystem:
         """Initialize data preparation module."""
         try:
             from quantum.data_preparation import PortfolioDataPreparer
-            self.data_preparer = PortfolioDataPreparer(tickers=self.tickers)
+            from datetime import datetime, timedelta
+            
+            # Set date range (last 1 year)
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=365)
+            
+            self.data_preparer = PortfolioDataPreparer(
+                tickers=self.tickers,
+                start_date=start_date,
+                end_date=end_date
+            )
             self.logger.info("✅ Data preparer initialized")
         except Exception as e:
             self.logger.warning(f"Data preparer not available: {e}")
@@ -98,7 +108,12 @@ class LiveTradingSystem:
     def _init_optimizer(self):
         """Initialize quantum optimizer."""
         try:
-            from quantum.quantum_optimizer import QuantumPortfolioOptimizer
+            # Try different possible module names
+            try:
+                from quantum.quantum_portfolio_optimizer import QuantumPortfolioOptimizer
+            except:
+                from quantum.portfolio_optimizer import QuantumPortfolioOptimizer
+            
             self.quantum_optimizer = QuantumPortfolioOptimizer(tickers=self.tickers)
             self.logger.info("✅ Quantum optimizer initialized")
         except Exception as e:
